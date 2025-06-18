@@ -92,9 +92,12 @@ if (isset ( $_GET ["act"] ) && $_GET ["act"] != "") {
                         while (false !== ($file = readdir($handle))) {
                             if ($file != "." && $file != "..") {
                                 $filePath = $dir . $file;
-                                if (!unlink($filePath)) {
-                                    $result['success'] = false;
-                                    $result['message'] = '无法删除文件：' . $filePath;
+                                // 只处理 .pdf 文件
+                                if (pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
+                                    if (!unlink($filePath)) {
+                                        $result['success'] = false;
+                                        $result['message'] = '无法删除文件：' . $filePath;
+                                    }
                                 }
                             }
                         }
