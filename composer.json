@@ -1,0 +1,6 @@
+{
+    "name": "root/axing",
+    "require": {
+        "xthiago/pdf-version-converter": "dev-master"
+    }
+}

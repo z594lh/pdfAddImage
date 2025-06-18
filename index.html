@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 转换配置</title>
+    <!-- 引入 Bootstrap CSS -->
+    <link rel="stylesheet" href="public/css/bootstrap.css">
+    <!-- 引入 jQuery 和 Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="public/js/bootstrap.min.js"></script>
+</head>
+<body>
+<div class="container mt-5">
+    <h2>先上传需要盖章的PDF</h2>
+    <form>
+        <div class="form-group row">
+            <label class="col-sm-2 col-form-label">上传PDF</label>
+            <div class="col-sm-8 align-items-center">
+                <div class="custom-file mr-3">
+                    <input type="file" class="custom-file-input" id="pdfUpload" lang="en">
+                    <label class="custom-file-label" for="pdfUpload">选择PDF文件</label>
+                </div>
+                <!-- 调整按钮大小和边距 -->
+            </div>
+            <div class="col-sm-2 align-items-center">
+                <button type="button" class="btn btn-primary" id="uploadBtn">上传</button>
+            </div>
+        </div>
+    </form>
+
+    <h2>已上传PDF列表</h2>
+    <table class="table table-striped mt-3" style="border: 1px solid #dee2e6;">
+        <thead>
+        <tr>
+            <th scope="col">文件名</th>
+            <th scope="col">上传时间</th>
+        </tr>
+        </thead>
+        <tbody id="pdfList">
+        <!-- PDF 文件列表将通过 JavaScript 动态插入 -->
+        </tbody>
+    </table>
+    <hr class="mb-4">
+
+    <h2>盖章生成的PDF列表</h2>
+    <hr class="mb-4">
+
+    <table class="table table-striped mt-3" style="border: 1px solid #dee2e6;">
+        <thead>
+        <tr>
+            <th scope="col">文件名</th>
+            <th scope="col">生成时间</th>
+        </tr>
+        </thead>
+        <tbody id="pdfListNew">
+        <!-- PDF 文件列表将通过 JavaScript 动态插入 -->
+        </tbody>
+    </table>
+
+
+
+    <hr class="mb-4">
+    <h2>PDF 转换配置</h2>
+    <form id="pdfConfigForm">
+
+        <div class="form-group row">
+            <label for="stampHeight" class="col-sm-2 col-form-label">选择PDF</label>
+            <div class="col-sm-10">
+                <select class="custom-select" name = 'checkpdf'>
+                    <option value="">请选择</option>
+                    <!-- 添加其他选项 -->
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group row">
+            <label for="xDistance" class="col-sm-2 col-form-label">X轴距离</label>
+            <div class="col-sm-10">
+                <input type="number" class="form-control" name="img_x" value="115" placeholder="请输入X轴距离">
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="yDistance" class="col-sm-2 col-form-label">Y轴距离</label>
+            <div class="col-sm-10">
+                <input type="number" class="form-control" name="img_y" value="105" placeholder="请输入Y轴距离">
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="stampWidth" class="col-sm-2 col-form-label">章的宽度</label>
+            <div class="col-sm-10">
+                <input type="number" class="form-control" name="img_w" value="45" placeholder="请输入章的宽度">
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="stampHeight" class="col-sm-2 col-form-label">章的高度</label>
+            <div class="col-sm-10">
+                <input type="number" class="form-control" name="img_h" value="45" placeholder="请输入章的高度">
+            </div>
+        </div>
+
+        <div class="form-group row">
+            <div class="col-sm-6">
+                <button type="button" class="btn btn-danger clear" >清除所有已上传PDF</button>
+            </div>
+            <div class="col-sm-6">
+                <button type="button" class="btn btn-primary" id="convertBtn" style="float: right">盖章</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    $(document).ready(function() {
+        loadPdfFilesList();
+        loadPdfFilesListNew();
+
+        $('.clear').on('click',function (){
+            var confirmation = confirm('您确定要清除所有已上传的PDF文件吗？这个操作不能撤销！');
+            if (confirmation) {
+                $.ajax({
+                    url: 'api.php?act=clear', // 指向您的后端脚本
+                    type: 'POST',
+                    success: function(data) {
+                        var obj = JSON.parse(data);
+                        if (obj && obj.success) {
+                            alert('所有PDF文件已被清除！');
+                            window.location.reload();
+                            // 可以在这里更新页面或执行其他操作
+                        } else {
+                            alert('清除文件失败：' + data.message);
+                        }
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('请求失败:', textStatus, errorThrown);
+                    }
+                });
+            }
+        })
+
+        $('#convertBtn').click(function() {
+            // 阻止表单默认提交行为（如果有）
+            event.preventDefault();
+
+            // 获取下拉选择框的值
+            var selectedValue = $('.custom-select').val();
+
+            // 检查选中的值是否为空字符串
+            if (!selectedValue) {
+                // 用户选择了除默认选项之外的其他选项
+                alert('请选择需要盖章的PDF');
+                return;
+            }
+            // 序列化表单数据
+            var formData = $('#pdfConfigForm').serialize();
+
+            // 发送 AJAX 请求到后台
+            $.ajax({
+                type: 'POST',
+                url: 'api.php?act=optPdf', // 替换为您的后端脚本URL
+                data: formData,
+                success: function(data) {
+                    // 请求成功时的回调函数
+                    alert(data);
+                    window.location.reload();
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    // 请求失败时的回调函数
+                    console.error('转换失败:', textStatus, errorThrown);
+                }
+            });
+        });
+
+        function deleteFile(fileName,type = 'old') {
+            if (confirm('确定要删除文件 ' + fileName + ' 吗?')) {
+                $.ajax({
+                    url: 'api.php?act=delete&type='+type+'&filename=' + encodeURIComponent(fileName),
+                    type: 'GET',
+                    data: {type:type},
+                    success: function(data) {
+                        alert('文件删除成功！');
+                        if(type == 'old'){
+                            loadPdfFilesList(); // 重新加载文件列表
+                        }else{
+                            loadPdfFilesListNew();
+                        }
+
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        alert('文件删除失败：' + textStatus);
+                    }
+                });
+            }
+        }
+
+        function downloadFile(fileName,type = 'old') {
+            var url = 'api.php?act=downloadfile&type='+type+'&filename=' + encodeURIComponent(fileName);
+            window.location.href = url; // 直接使用 location.href 启动下载
+        }
+
+        // 监听文件选择框的变化
+        $('#pdfUpload').on('change', function(e) {
+            var fileName = e.target.files[0].name; // 获取选中的文件名
+            $(this).next('.custom-file-label').html(fileName); // 设置标签显示文件名
+        });
+
+        $('#uploadBtn').click(function() {
+            var fileInput = $('#pdfUpload')[0].files[0]; // 获取文件输入框的文件
+            var formData = new FormData(); // 创建FormData对象
+            formData.append('pdfUpload', fileInput); // 添加文件到FormData对象
+
+            // 发送 AJAX 请求到 api.php
+            $.ajax({
+                url: 'api.php?act=uploadfile', // 设置请求的URL
+                type: 'POST', // 请求方式
+                data: formData, // 要发送的数据
+                processData: false, // 告诉jQuery不要处理发送的数据
+                contentType: false, // 告诉jQuery不要设置内容类型
+                success: function(data) { // 请求成功时的回调函数
+
+                    if(data.trim() === "文件上传成功。" || data.trim() === "文件已存在。") {
+                        // 上传成功，弹出提示框
+                        alert(data);
+                        window.location.reload();
+                    } else {
+                        alert("上传失败：" + data); // 显示失败原因
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('文件上传失败:', textStatus, errorThrown);
+                }
+            });
+        });
+
+
+        function loadPdfFilesList() {
+            $.ajax({
+                url: 'api.php?act=getPdfList', // 请求 api.php 获取 PDF 文件列表
+                type: 'GET',
+                data: {type:'old'},
+                dataType: 'json', // 明确指定期望的响应数据类型为 JSON
+                success: function(data) {
+                    // 假设数据是数组形式，每个元素都是一个对象，包含文件名和修改时间
+                    var files = data.files;
+                    /*表格*/
+                    var tbody = $('#pdfList');
+                    tbody.empty(); // 清空现有的列表
+                    /*下拉框*/
+                    var selectElement = $('.custom-select');
+                    selectElement.empty(); // 清空现有的选项
+                    selectElement.append('<option value="">请选择</option>');
+
+                    files.forEach(function(file) {
+                        tbody.append(
+                            '<tr>' +
+                            '<td>' + file.name + '</td>' +
+                            '<td>' + file.mtime + '</td>' +
+                            '<td>' +
+                            '<button class="btn btn-sm btn-danger delete-btn" data-file="' + file.name + '">删除</button> ' +
+                            '<button class="btn btn-sm btn-success download-btn" data-file="' + file.name + '">下载</button>' +
+                            '<a href="#" class="btn btn-sm btn-info preview-btn" style="margin-left: 3px" data-file="' + file.name + '" data-url="' + file.path + '">预览</a> ' +
+                            '</td>' +
+                            '</td>' +
+                            '</tr>'
+                        );
+                        selectElement.append('<option value="' + file.name + '">' + file.name + '</option>');
+                    });
+
+                    $(document).on('click', '.delete-btn', function() {
+                        var fileName = $(this).data('file');
+                        deleteFile(fileName,'old');
+                    });
+                    // 绑定下载按钮的点击事件
+                    $(document).on('click', '.download-btn', function() {
+                        var fileName = $(this).data('file');
+                        downloadFile(fileName,'old');
+                    });
+                    $(document).on('click', '.preview-btn', function(event) {
+                        event.preventDefault(); // 阻止链接的默认行为
+                        var fileName = $(this).data('file');
+                        var url = $(this).data('url');
+                        var pdfUrl = url + encodeURIComponent(fileName); // PDF文件的URL
+                        window.open(pdfUrl, '_blank'); // 在新标签页中打开PDF
+                    });
+
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('获取文件列表失败:', textStatus, errorThrown);
+                }
+            });
+        }
+
+        function loadPdfFilesListNew() {
+            $.ajax({
+                url: 'api.php?act=getPdfList', // 请求 api.php 获取 PDF 文件列表
+                type: 'GET',
+                data: {type:'new'},
+                dataType: 'json', // 明确指定期望的响应数据类型为 JSON
+                success: function(data) {
+                    // 假设数据是数组形式，每个元素都是一个对象，包含文件名和修改时间
+                    var files = data.files;
+                    /*表格*/
+                    var tbody = $('#pdfListNew');
+                    tbody.empty(); // 清空现有的列表
+
+                    files.forEach(function(file) {
+                        tbody.append(
+                            '<tr>' +
+                            '<td>' + file.name + '</td>' +
+                            '<td>' + file.mtime + '</td>' +
+                            '<td>' +
+                            '<button class="btn btn-sm btn-danger delete-btn-new" data-file="' + file.name + '">删除</button> ' +
+                            '<button class="btn btn-sm btn-success download-btn-new" data-file="' + file.name + '">下载</button>' +
+                            '<a href="#" class="btn btn-sm btn-info preview-btn-new" style="margin-left: 3px" data-file="' + file.name + '" data-url="' + file.path + '">预览</a> ' +
+                            '</td>' +
+                            '</td>' +
+                            '</tr>'
+                        );
+                    });
+
+                    $(document).on('click', '.delete-btn-new', function() {
+                        var fileName = $(this).data('file');
+                        deleteFile(fileName,'new');
+                    });
+                    // 绑定下载按钮的点击事件
+                    $(document).on('click', '.download-btn-new', function() {
+                        var fileName = $(this).data('file');
+                        downloadFile(fileName,'new');
+                    });
+                    $(document).on('click', '.preview-btn-new', function(event) {
+                        event.preventDefault(); // 阻止链接的默认行为
+                        var fileName = $(this).data('file');
+                        var url = $(this).data('url');
+                        var pdfUrl = url + encodeURIComponent(fileName); // PDF文件的URL
+                        window.open(pdfUrl, '_blank'); // 在新标签页中打开PDF
+                    });
+
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('获取文件列表失败:', textStatus, errorThrown);
+                }
+            });
+        }
+
+    });
+</script>
+</body>
+</html>
